@@ -57,6 +57,7 @@ interface Food {
   price: number;
   image_url: string;
   formattedPrice: string;
+  category: number;
   extras: Extra[];
 }
 
@@ -74,6 +75,24 @@ const FoodDetails: React.FC = () => {
   useEffect(() => {
     async function loadFood(): Promise<void> {
       // Load a specific food with extras based on routeParams id
+      const resFood = await api.get(`/foods/${routeParams.id}`);
+      const resFavorite = await api.get(`/favorites?id=${routeParams.id}`);
+      console.log(resFavorite.data);
+      setIsFavorite(
+        resFavorite.data.map((item: Food) => item.id).includes(routeParams.id),
+      );
+      setFood({
+        ...resFood.data,
+        formattedPrice: formatValue(resFood.data.price),
+      });
+      setExtras(
+        resFood.data.extras.map((item: Extra) => {
+          return {
+            ...item,
+            quantity: 0,
+          };
+        }),
+      );
     }
 
     loadFood();
@@ -81,30 +100,79 @@ const FoodDetails: React.FC = () => {
 
   function handleIncrementExtra(id: number): void {
     // Increment extra quantity
+    const newExtra = extras.map(item => {
+      if (item.id === id) {
+        return { ...item, quantity: item.quantity + 1 };
+      } else {
+        return item;
+      }
+    });
+    setExtras(newExtra);
   }
 
   function handleDecrementExtra(id: number): void {
     // Decrement extra quantity
+    const newExtra = extras.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          quantity: item.quantity === 0 ? 0 : item.quantity - 1,
+        };
+      } else {
+        return item;
+      }
+    });
+    setExtras(newExtra);
   }
 
   function handleIncrementFood(): void {
     // Increment food quantity
+    setFoodQuantity(foodQuantity + 1);
   }
 
   function handleDecrementFood(): void {
     // Decrement food quantity
+    setFoodQuantity(foodQuantity === 1 ? 1 : foodQuantity - 1);
   }
 
-  const toggleFavorite = useCallback(() => {
+  const toggleFavorite = useCallback(async () => {
     // Toggle if food is favorite or not
+    try {
+      if (isFavorite) {
+        await api.delete(`/favorites/${routeParams.id}`);
+        setIsFavorite(false);
+        return;
+      }
+      await api.post(`/favorites`, food);
+      setIsFavorite(true);
+    } catch (error) {}
   }, [isFavorite, food]);
 
   const cartTotal = useMemo(() => {
     // Calculate cartTotal
+    const priceFood = food.price;
+    const priceExtra = extras.reduce((acc, curr) => {
+      return acc + curr.quantity * curr.value;
+    }, 0);
+
+    return formatValue(priceExtra + priceFood * foodQuantity);
   }, [extras, food, foodQuantity]);
 
   async function handleFinishOrder(): Promise<void> {
     // Finish the order and save on the API
+    try {
+      const res = await api.post('/orders', {
+        product_id: food.id,
+        name: food.name,
+        description: food.description,
+        price: food.price,
+        category: food.category,
+        thumbnail_url:
+          'https://storage.googleapis.com/golden-wind/bootcamp-gostack/desafio-gorestaurant-mobile/ao_molho.png',
+        extras,
+      });
+      console.log(res.data);
+    } catch (error) {}
   }
 
   // Calculate the correct icon name
